@@ -2,6 +2,6 @@
 **/__pycache__
 venv
 
+config.py
 chromedriver.exe
 previous_cookies.json
-config.json
