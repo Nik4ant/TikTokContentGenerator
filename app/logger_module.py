@@ -1,9 +1,9 @@
 import sys
 import logging
 
-import coloredlogs
+from config import LOGGER_STYLES, IS_PRODUCTION
 
-from config import LOGGER_STYLES
+import coloredlogs
 
 
 class LoggerWrapper(logging.Logger):
@@ -13,7 +13,9 @@ class LoggerWrapper(logging.Logger):
     def error(self, msg, *args, **kwargs) -> None:
         """Logs error message, notifies about this message and exits app"""
         super().error(msg, *args, **kwargs)
-        # TODO: notifying logic here for any error
+        if IS_PRODUCTION:
+            # TODO: notifying logic here for any error
+            pass
         sys.exit(1)
 
 

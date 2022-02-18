@@ -1,22 +1,22 @@
 import os
 import sys
 
-from app import logger_module
-# TODO: rethink structure because currently usage looks weird: video_uploader.upload_video()
-#  So maybe:
-#  a) make TikTok.py with all stuff in it
-#  b) rename to video_uploader.upload()
-from app.TikTok import video_uploader
+
+sys.path.append(os.path.abspath(os.curdir))
+
+
+from app import logger_module, TikTok, StackOverFlow
+from app.Video import generator
 
 
 def main():
-    video_uploader.upload_video()
+    generator.create_video()
+    # TikTok.upload_video()
 
     logger_module.logger.info("Done")
 
 
 if __name__ == '__main__':
-    sys.path.append(os.path.abspath(os.curdir))
     logger_module.init()
     try:
         main()

@@ -1,0 +1,191 @@
+<h1>Short Answer</h1>
+<p>It's boilerplate code that protects users from accidentally invoking the script when they didn't intend to. Here are some common problems when the guard is omitted from a script:</p>
+<ul>
+<li><p>If you import the guardless script in another script (e.g. <code>import my_script_without_a_name_eq_main_guard</code>), then the second script will trigger the first to run <em>at import time</em> and <em>using the second script's command line arguments</em>. This is almost always a mistake.</p>
+</li>
+<li><p>If you have a custom class in the guardless script and save it to a pickle file, then unpickling it in another script will trigger an import of the guardless script, with the same problems outlined in the previous bullet.</p>
+</li>
+</ul>
+<h1>Long Answer</h1>
+<p>To better understand why and how this matters, we need to take a step back to understand how Python initializes scripts and how this interacts with its module import mechanism.</p>
+<p>Whenever the Python interpreter reads a source file, it does two things:</p>
+<ul>
+<li><p>it sets a few special variables like <code>__name__</code>, and then</p>
+</li>
+<li><p>it executes all of the code found in the file.</p>
+</li>
+</ul>
+<p>Let's see how this works and how it relates to your question about the <code>__name__</code> checks we always see in Python scripts.</p>
+<h2>Code Sample</h2>
+<p>Let's use a slightly different code sample to explore how imports and scripts work.  Suppose the following is in a file called <code>foo.py</code>.</p>
+<pre class="lang-py s-code-block"><code class="hljs language-python"><span class="hljs-comment"># Suppose this is foo.py.</span>
+
+<span class="hljs-built_in">print</span>(<span class="hljs-string">"before import"</span>)
+<span class="hljs-keyword">import</span> math
+
+<span class="hljs-built_in">print</span>(<span class="hljs-string">"before functionA"</span>)
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">functionA</span>():
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">"Function A"</span>)
+
+<span class="hljs-built_in">print</span>(<span class="hljs-string">"before functionB"</span>)
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">functionB</span>():
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">"Function B {}"</span>.<span class="hljs-built_in">format</span>(math.sqrt(<span class="hljs-number">100</span>)))
+
+<span class="hljs-built_in">print</span>(<span class="hljs-string">"before __name__ guard"</span>)
+<span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">'__main__'</span>:
+    functionA()
+    functionB()
+<span class="hljs-built_in">print</span>(<span class="hljs-string">"after __name__ guard"</span>)
+</code></pre>
+<h2>Special Variables</h2>
+<p>When the Python interpreter reads a source file, it first defines a few special variables. In this case, we care about the <code>__name__</code> variable.</p>
+<p><strong>When Your Module Is the Main Program</strong></p>
+<p>If you are running your module (the source file) as the main program, e.g.</p>
+<pre class="lang-py s-code-block"><code class="hljs language-python">python foo.py
+</code></pre>
+<p>the interpreter will assign the hard-coded string <code>"__main__"</code> to the <code>__name__</code> variable, i.e.</p>
+<pre class="lang-py s-code-block"><code class="hljs language-python"><span class="hljs-comment"># It's as if the interpreter inserts this at the top</span>
+<span class="hljs-comment"># of your module when run as the main program.</span>
+__name__ = <span class="hljs-string">"__main__"</span>
+</code></pre>
+<p><strong>When Your Module Is Imported By Another</strong></p>
+<p>On the other hand, suppose some other module is the main program and it imports your module. This means there's a statement like this in the main program, or in some other module the main program imports:</p>
+<pre class="lang-py s-code-block"><code class="hljs language-python"><span class="hljs-comment"># Suppose this is in some other main program.</span>
+<span class="hljs-keyword">import</span> foo
+</code></pre>
+<p>The interpreter will search for your <code>foo.py</code> file (along with searching for a few other variants), and prior to executing that module, it will assign the name <code>"foo"</code> from the import statement to the <code>__name__</code> variable, i.e.</p>
+<pre class="lang-py s-code-block"><code class="hljs language-python"><span class="hljs-comment"># It's as if the interpreter inserts this at the top</span>
+<span class="hljs-comment"># of your module when it's imported from another module.</span>
+__name__ = <span class="hljs-string">"foo"</span>
+</code></pre>
+<h2>Executing the Module's Code</h2>
+<p>After the special variables are set up, the interpreter executes all the code in the module, one statement at a time. You may want to open another window on the side with the code sample so you can follow along with this explanation.</p>
+<p><strong>Always</strong></p>
+<ol>
+<li><p>It prints the string <code>"before import"</code> (without quotes).</p>
+</li>
+<li><p>It loads the <code>math</code> module and assigns it to a variable called <code>math</code>. This is equivalent to replacing <code>import math</code> with the following (note that <code>__import__</code> is a low-level function in Python that takes a string and triggers the actual import):</p>
+</li>
+</ol>
+<pre class="lang-py s-code-block"><code class="hljs language-python"><span class="hljs-comment"># Find and load a module given its string name, "math",</span>
+<span class="hljs-comment"># then assign it to a local variable called math.</span>
+math = <span class="hljs-built_in">__import__</span>(<span class="hljs-string">"math"</span>)
+</code></pre>
+<ol start="3">
+<li><p>It prints the string <code>"before functionA"</code>.</p>
+</li>
+<li><p>It executes the <code>def</code> block, creating a function object, then assigning that function object to a variable called <code>functionA</code>.</p>
+</li>
+<li><p>It prints the string <code>"before functionB"</code>.</p>
+</li>
+<li><p>It executes the second <code>def</code> block, creating another function object, then assigning it to a variable called <code>functionB</code>.</p>
+</li>
+<li><p>It prints the string <code>"before __name__ guard"</code>.</p>
+</li>
+</ol>
+<p><strong>Only When Your Module Is the Main Program</strong></p>
+<ol start="8">
+<li>If your module is the main program, then it will see that <code>__name__</code> was indeed set to <code>"__main__"</code> and it calls the two functions, printing the strings <code>"Function A"</code> and <code>"Function B 10.0"</code>.</li>
+</ol>
+<p><strong>Only When Your Module Is Imported by Another</strong></p>
+<ol start="8">
+<li>(<strong>instead</strong>) If your module is not the main program but was imported by another one, then <code>__name__</code> will be <code>"foo"</code>, not <code>"__main__"</code>, and it'll skip the body of the <code>if</code> statement.</li>
+</ol>
+<p><strong>Always</strong></p>
+<ol start="9">
+<li>It will print the string <code>"after __name__ guard"</code> in both situations.</li>
+</ol>
+<p><em><strong>Summary</strong></em></p>
+<p>In summary, here's what'd be printed in the two cases:</p>
+<pre class="lang-none s-code-block"><code># What gets printed if foo is the main program
+before import
+before functionA
+before functionB
+before __name__ guard
+Function A
+Function B 10.0
+after __name__ guard
+</code></pre>
+<pre class="lang-none s-code-block"><code># What gets printed if foo is imported as a regular module
+before import
+before functionA
+before functionB
+before __name__ guard
+after __name__ guard
+</code></pre>
+<h2>Why Does It Work This Way?</h2>
+<p>You might naturally wonder why anybody would want this.  Well, sometimes you want to write a <code>.py</code> file that can be both used by other programs and/or modules as a module, and can also be run as the main program itself.  Examples:</p>
+<ul>
+<li><p>Your module is a library, but you want to have a script mode where it runs some unit tests or a demo.</p>
+</li>
+<li><p>Your module is only used as a main program, but it has some unit tests, and the testing framework works by importing <code>.py</code> files like your script and running special test functions. You don't want it to try running the script just because it's importing the module.</p>
+</li>
+<li><p>Your module is mostly used as a main program, but it also provides a programmer-friendly API for advanced users.</p>
+</li>
+</ul>
+<p>Beyond those examples, it's elegant that running a script in Python is just setting up a few magic variables and importing the script. "Running" the script is a side effect of importing the script's module.</p>
+<h2>Food for Thought</h2>
+<ul>
+<li><p>Question: Can I have multiple <code>__name__</code> checking blocks?  Answer: it's strange to do so, but the language won't stop you.</p>
+</li>
+<li><p>Suppose the following is in <code>foo2.py</code>.  What happens if you say <code>python foo2.py</code> on the command-line? Why?</p>
+</li>
+</ul>
+<pre class="lang-py s-code-block"><code class="hljs language-python"><span class="hljs-comment"># Suppose this is foo2.py.</span>
+<span class="hljs-keyword">import</span> os, sys; sys.path.insert(<span class="hljs-number">0</span>, os.path.dirname(__file__)) <span class="hljs-comment"># needed for some interpreters</span>
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">functionA</span>():
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">"a1"</span>)
+    <span class="hljs-keyword">from</span> foo2 <span class="hljs-keyword">import</span> functionB
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">"a2"</span>)
+    functionB()
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">"a3"</span>)
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">functionB</span>():
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">"b"</span>)
+
+<span class="hljs-built_in">print</span>(<span class="hljs-string">"t1"</span>)
+<span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">"__main__"</span>:
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">"m1"</span>)
+    functionA()
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">"m2"</span>)
+<span class="hljs-built_in">print</span>(<span class="hljs-string">"t2"</span>)
+
+</code></pre>
+<ul>
+<li>Now, figure out what will happen if you remove the <code>__name__</code> check in <code>foo3.py</code>:</li>
+</ul>
+<pre class="lang-py s-code-block"><code class="hljs language-python"><span class="hljs-comment"># Suppose this is foo3.py.</span>
+<span class="hljs-keyword">import</span> os, sys; sys.path.insert(<span class="hljs-number">0</span>, os.path.dirname(__file__)) <span class="hljs-comment"># needed for some interpreters</span>
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">functionA</span>():
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">"a1"</span>)
+    <span class="hljs-keyword">from</span> foo3 <span class="hljs-keyword">import</span> functionB
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">"a2"</span>)
+    functionB()
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">"a3"</span>)
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">functionB</span>():
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">"b"</span>)
+
+<span class="hljs-built_in">print</span>(<span class="hljs-string">"t1"</span>)
+<span class="hljs-built_in">print</span>(<span class="hljs-string">"m1"</span>)
+functionA()
+<span class="hljs-built_in">print</span>(<span class="hljs-string">"m2"</span>)
+<span class="hljs-built_in">print</span>(<span class="hljs-string">"t2"</span>)
+</code></pre>
+<ul>
+<li>What will this do when used as a script?  When imported as a module?</li>
+</ul>
+<pre class="lang-py s-code-block"><code class="hljs language-python"><span class="hljs-comment"># Suppose this is in foo4.py</span>
+__name__ = <span class="hljs-string">"__main__"</span>
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">bar</span>():
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">"bar"</span>)
+
+<span class="hljs-built_in">print</span>(<span class="hljs-string">"before __name__ guard"</span>)
+<span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">"__main__"</span>:
+    bar()
+<span class="hljs-built_in">print</span>(<span class="hljs-string">"after __name__ guard"</span>)
+</code></pre>
+    </div>

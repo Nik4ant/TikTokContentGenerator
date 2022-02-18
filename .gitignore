@@ -2,6 +2,7 @@
 **/__pycache__
 venv
 
+app/Video/data/result
 config.py
 chromedriver.exe
 previous_cookies.json

@@ -3,7 +3,7 @@ import json
 
 from app.logger_module import logger
 from app import selenium_utils as utils
-from config import TIKTOK_OLD_COOKIES_FILENAME, PATH_TO_DRIVER, LAUNCH_COOKIES
+from config import TIKTOK_OLD_COOKIES_FILENAME, DRIVER_PATH, LAUNCH_COOKIES
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -35,7 +35,7 @@ def login_to_page() -> webdriver.Chrome:
     :return: Configured chromedriver
     """
     logger.info("Configuring driver for TikTok")
-    driver = utils.get_configured_webdriver(PATH_TO_DRIVER)
+    driver = utils.get_configured_webdriver(DRIVER_PATH)
     # If old cookies exists using them instead
     if os.path.exists(TIKTOK_OLD_COOKIES_FILENAME):
         with open(TIKTOK_OLD_COOKIES_FILENAME, mode="r") as file:
