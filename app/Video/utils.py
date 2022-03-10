@@ -1,18 +1,42 @@
-from os import path
+from os import path, remove
+from random import choice
 
-from app.Video.video_config import SOURCE_PATH, FPS, RESULT_PATH
+from config import VIDEO_STATIC_PATH
 
-from PIL import Image, ImageFont, ImageDraw
 import moviepy.editor as mpe
+from PIL import Image, ImageFont, ImageDraw
 from moviepy.audio.fx.audio_loop import audio_loop
 
 
+TYPING_SOUNDS = {
+    # TODO: maybe faster sounds? (idk)
+    "basic": [
+        mpe.AudioFileClip(path.join(VIDEO_STATIC_PATH, "typing_1.mp3")),
+        mpe.AudioFileClip(path.join(VIDEO_STATIC_PATH, "typing_2.mp3")),
+        mpe.AudioFileClip(path.join(VIDEO_STATIC_PATH, "typing_3.mp3")),
+        mpe.AudioFileClip(path.join(VIDEO_STATIC_PATH, "typing_4.mp3")),
+        mpe.AudioFileClip(path.join(VIDEO_STATIC_PATH, "typing_5.mp3")),
+        mpe.AudioFileClip(path.join(VIDEO_STATIC_PATH, "typing_6.mp3")),
+        mpe.AudioFileClip(path.join(VIDEO_STATIC_PATH, "typing_7.mp3")),
+        mpe.AudioFileClip(path.join(VIDEO_STATIC_PATH, "typing_8.mp3")),
+    ],
+    # TODO: Need better sounds. Current one is working, but sucks
+    # " ": [
+    #     mpe.AudioFileClip(path.join(VIDEO_STATIC_PATH, "typing_space_1.mp3")),
+    #   mpe.AudioFileClip(path.join(VIDEO_STATIC_PATH, "typing_space_2.mp3")),
+    # ],
+    # "\n": [
+    #     mpe.AudioFileClip(path.join(VIDEO_STATIC_PATH, "typing_enter_1.mp3")),
+    # ]
+}
+
+
 def load_image(filename: str, mode="RGB") -> Image.Image:
-    return Image.open(path.join(SOURCE_PATH, filename)).convert(mode)
+    return Image.open(path.join(VIDEO_STATIC_PATH, filename)).convert(mode)
 
 
 def load_font(filename: str, size=24) -> ImageFont.ImageFont:
-    return ImageFont.truetype(path.join(SOURCE_PATH, filename), size=size)
+    return ImageFont.truetype(path.join(VIDEO_STATIC_PATH, filename), size=size)
 
 
 def draw_text(surface: Image.Image, text: str, font: ImageFont.ImageFont,
@@ -25,31 +49,27 @@ def draw_text(surface: Image.Image, text: str, font: ImageFont.ImageFont,
 
 
 def animate_text_typing(text: str, font: ImageFont.ImageFont, background_image: Image.Image,
-                        global_frame_counter: int, char_limit_for_new_line: int,
-                        frame_duration: float = 1 / (FPS * 0.5), sound_volume_modifier=0.3,
-                        typing_sound_path=path.join(SOURCE_PATH, "text_typing.mp3"),
+                        char_limit_for_new_line: int, sound_volume_modifier=0.14, frame_duration_modifier=0.75,
                         text_color=(240, 240, 240), text_center_x=True, text_center_y=True) -> mpe.VideoClip:
-    # TODO: individual sound for each char (duration for ImageClip will be the same as sound length).
-    #  This also will make sound for new line better.
-    #  Source: https://www.fesliyanstudios.com/royalty-free-sound-effects-download/keyboard-typing-6 (Single Button)
-
-    # TODO: also support for multiline text
-    frame_path_format_string = path.join(RESULT_PATH, "frames", "{0:05}.png")
-    start_frame_num = global_frame_counter
+    # TODO: char_limit_for_new_line multiline support? (not sure if this is a good place to handle this)
+    result_clips = []
+    # File will be deleted anyway so it's location doesn't matter
+    current_temp_frame_path = path.abspath("temp_frame.png")
     # Step 1. Generate frames
     for i in range(-1, len(text)):
         current_frame = background_image.copy()
-
         draw_text(current_frame, text[:i + 1], font, text_color, text_center_x, text_center_y)
-
-        current_frame.save(frame_path_format_string.format(global_frame_counter))
-        global_frame_counter += 1
+        current_frame.save(current_temp_frame_path)
+        # Random typing sound for each char
+        current_sound = choice(TYPING_SOUNDS.get(text[i], TYPING_SOUNDS["basic"]))
+        frame_duration = current_sound.duration
+        result_clips.append(mpe.ImageClip(current_temp_frame_path)
+                            .set_audio(mpe.CompositeAudioClip([current_sound]))
+                            .set_duration(frame_duration * frame_duration_modifier))
+    # Deleting file used for temp frame
+    remove(current_temp_frame_path)
     # Step 2. Create clip from generated frames
-    clip = mpe.concatenate_videoclips([mpe.ImageClip(frame_path_format_string.format(i)).set_duration(frame_duration)
-                                       for i in range(start_frame_num, global_frame_counter)],
-                                      method="compose")
-    # Step 3. Add looping audio to clip
-    clip = clip.set_audio(audio_loop(mpe.AudioFileClip(typing_sound_path),
-                                     duration=clip.duration))
+    clip = mpe.concatenate_videoclips(result_clips, method="compose")
     clip = clip.volumex(sound_volume_modifier)
+
     return clip

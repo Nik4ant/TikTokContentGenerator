@@ -1,7 +1,9 @@
 import sys
 import logging
+import traceback
 
-from config import LOGGER_STYLES, IS_PRODUCTION
+from app.SocialMediaManager import Telegram
+from config import TELEGRAM_OWNER_CHAT_ID
 
 import coloredlogs
 
@@ -9,13 +11,22 @@ import coloredlogs
 class LoggerWrapper(logging.Logger):
     def __init__(self, name: str):
         super().__init__(name)
+        # If true bot will DM owner if something goes wrong (default False)
+        # Note: No way to init it here so this var is set in init function below
+        self.notify_owner_on_error = False
 
     def error(self, msg, *args, **kwargs) -> None:
         """Logs error message, notifies about this message and exits app"""
         super().error(msg, *args, **kwargs)
-        if IS_PRODUCTION:
-            # TODO: notifying logic here for any error
-            pass
+        if self.notify_owner_on_error or True:
+            exc_type, exc_value, exc_traceback = kwargs.get("exc_info", (None, None, None, ))
+            message_html = msg
+            if exc_type is not None:
+                # TODO:
+                pass
+            # Notifying about error without
+            telegram_loop = Telegram.dispatcher.loop
+            telegram_loop.create_task(Telegram.bot.send_message(TELEGRAM_OWNER_CHAT_ID, message_html, parse_mode="html"))
         sys.exit(1)
 
 
@@ -24,9 +35,19 @@ logging.setLoggerClass(LoggerWrapper)
 logger = logging.getLogger(__name__)
 
 
-def init() -> None:
-    """Add colors and other configurations to logger"""
+def init(logger_styles: dict, notify_owner_on_error: bool = False) -> None:
+    """Add colors and do other logger configuration"""
+    sys.excepthook = handle_exception
+    logger.notify_owner_on_error = notify_owner_on_error
     coloredlogs.install(level=logging.DEBUG, logger=logger,
                         fmt="[%(asctime)s] %(levelname)s: %(message)s",
-                        field_styles=LOGGER_STYLES["FIELD"],
-                        level_styles=LOGGER_STYLES["LEVEL"])
+                        field_styles=logger_styles["field_styles"],
+                        level_styles=logger_styles["level_styles"])
+
+
+def handle_exception(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+
+    logger.error("Unhandled exception", exc_info=(exc_type, exc_value, exc_traceback))

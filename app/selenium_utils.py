@@ -131,7 +131,7 @@ def get_configured_webdriver(path_to_driver: str) -> webdriver.Chrome:
 
 def set_cookies_for_browser(driver: webdriver.Chrome, cookies: List[dict]) -> None:
     """
-    Adds cookies to driver BEFORE visiting any page by using chrome dev tools.
+    Adds cookies to driver by using chrome dev tools.
     Source: https://stackoverflow.com/a/63220249/13940541
     :param driver: chromedriver
     :param cookies: List with cookies
