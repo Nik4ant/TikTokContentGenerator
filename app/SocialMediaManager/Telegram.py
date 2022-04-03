@@ -3,9 +3,11 @@ from typing import Dict, Tuple, Callable
 from os import path
 
 from config import TELEGRAM_OWNER_CHAT_ID, TELEGRAM_TOKEN
-from app import logger_module
+from app.logger_module import logger
 
 import aiogram
+from aiogram.utils import executor
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 
 # This is used to keep track of videos that need human voice acting.
@@ -13,10 +15,17 @@ import aiogram
 latest_audio_requests: Dict[int, Tuple[str, Callable[[str, str], None]]] = dict()
 bot = aiogram.Bot(TELEGRAM_TOKEN)
 dispatcher = aiogram.Dispatcher(bot)
+# default keyboard
+default_keyboard = ReplyKeyboardMarkup(one_time_keyboard=False, resize_keyboard=True)
+default_keyboard.add(KeyboardButton(text="Generate from question URL"))
+default_keyboard.add(KeyboardButton(text="Find random question"))
+default_keyboard.add(KeyboardButton(text="Change config values (TODO)"))
+default_keyboard.add(KeyboardButton(text="Stop server/bot"))
 
 
-async def run_bot() -> None:
-    await dispatcher.start_polling()
+def run_bot() -> None:
+    logger.info("Starting Telegram bot")
+    executor.start_polling(dispatcher)
 
 
 async def ask_for_human_audio(path_to_video: str, callback: Callable[[str, str], None]) -> None:
@@ -57,7 +66,8 @@ async def handle_voice_message(message: aiogram.types.Message):
 
 
 @dispatcher.message_handler(commands="/stop")
-async def stop_server(message: aiogram.types.Message):
+async def stop_bot(message: aiogram.types.Message):
+    logger.info("Closing Telegram bot")
     await dispatcher.stop_polling()
     await bot.close()
 
